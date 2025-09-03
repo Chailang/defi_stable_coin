@@ -24,13 +24,12 @@
 // view & pure functions
 pragma solidity 0.8.30;
 
-import {ERC20Burnable, ERC20} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
+import {ERC20Burnable,ERC20} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-
-contract DecentralizedStableCoin is ERC20Burnable, Ownable {
+contract DecentralizedStableCoin is ERC20Burnable,Ownable {
     // Errors
     error DecentralizedStableCoin__MustBeMoreThanZero();
-    error DecentralizedStableCoin__BurnAmountExceedsBalance(); //销毁数量超过余额
+    error DecentralizedStableCoin__BurnAmountExceedsBalance();//销毁数量超过余额
     error DecentralizedStableCoin__NotZeroAddress();
     // Type Declarations
 
@@ -39,6 +38,7 @@ contract DecentralizedStableCoin is ERC20Burnable, Ownable {
     event Burned(address indexed burner, uint256 amount);
     // State Variables
 
+    
     // Functions
     constructor() ERC20("Decentralized Stable Coin", "DSC") Ownable(msg.sender) {
         // mint initial supply to contract creator for demo purposes
@@ -64,8 +64,10 @@ contract DecentralizedStableCoin is ERC20Burnable, Ownable {
      * @param amount The amount of DSC to mint
      * @notice Only the owner (i.e. the DSC engine) can mint new DSC
      */
-
-    function mint(address to, uint256 amount) external onlyOwner {
+    function mint(
+        address to, 
+        uint256 amount
+    ) external onlyOwner returns (bool) {
         if (to == address(0)) {
             revert DecentralizedStableCoin__NotZeroAddress();
         }
@@ -74,5 +76,7 @@ contract DecentralizedStableCoin is ERC20Burnable, Ownable {
         }
         _mint(to, amount);
         emit Minted(msg.sender, amount);
+        return true;
     }
+
 }
