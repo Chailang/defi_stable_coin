@@ -26,7 +26,7 @@ pragma solidity 0.8.30;
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { DecentralizedStableCoin } from "./DecentralizedStableCoin.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
+import { OracleLib, AggregatorV3Interface } from "./libraries/OracleLib.sol";
 /*
 *@title DSCEngine
 *该系统的设计尽可能地最小化，并让代币始终保持1个代币==1美元的挂钩。
@@ -59,7 +59,11 @@ contract Dscengine is ReentrancyGuard{
     ///////////////////
     // Types
     ///////////////////
-    // using OracleLib for AggregatorV3Interface;
+
+    // using ... for ... 是 Solidity 的语法，用于 为某个类型附加库函数。
+    // 这里的意思是：将 OracleLib 库中的函数，附加给 AggregatorV3Interface 类型的变量。
+    // 这样，任何 AggregatorV3Interface 类型的实例都可以像调用成员函数一样直接调用库里的函数。
+    using OracleLib for AggregatorV3Interface;
 
     ///////////////////
     // State Variables
@@ -168,6 +172,33 @@ contract Dscengine is ReentrancyGuard{
             revert DSCEngine__TransferFailed();
         }
     }
+     /*
+     * @param tokenCollateralAddress: 地址
+     * @param amountCollateral: 数量
+     * @notice 赎回抵押品
+     * @notice 销毁后才可以铸造
+     */
+    function redeemCollateral(
+        address tokenCollateralAddress,
+        uint256 amountCollateral
+    )
+        external
+        moreThanZero(amountCollateral)
+        nonReentrant
+        isAllowedToken(tokenCollateralAddress)
+    {
+        _redeemCollateral(tokenCollateralAddress, amountCollateral, msg.sender, msg.sender);
+        _revertIfHealthFactorIsBroken(msg.sender);
+    }
+     /*
+     * @notice 注意！你将销毁你的DSC
+     * @dev 如果你担心自己可能会被清算，但又想销毁你的 DSC 同时保留抵押品，那么你可能会用到这个功能。
+     */
+    function burnDsc(uint256 amount) external moreThanZero(amount) {
+        _burnDsc(amount, msg.sender, msg.sender);
+        _revertIfHealthFactorIsBroken(msg.sender); 
+    }
+
      /**
     //  * @param amountDscToMint  铸造稳定币的数量
     //  * @notice 铸造稳定币 DSC  抵押价值必须大于等于铸造的 DSC 价值
@@ -434,7 +465,7 @@ contract Dscengine is ReentrancyGuard{
             revert DSCEngine__TokenNotAllowed(token);
         }
          AggregatorV3Interface priceFeed = AggregatorV3Interface(s_priceFeeds[token]);
-        (, int256 price,,,) = priceFeed.latestRoundData();
+        (, int256 price,,,) = priceFeed.staleCheckLatestRoundData();
         // 价格为8位精度
         // 数量为18位精度
         // 精度对齐
@@ -468,11 +499,54 @@ contract Dscengine is ReentrancyGuard{
     function getTokenAmountFromUsd(address token, uint256 usdAmountInWei) public view returns (uint256) {
         AggregatorV3Interface priceFeed = AggregatorV3Interface(s_priceFeeds[token]);
         // 用来获取代币对 USD 的价格。 
-        (, int256 price,,,) = priceFeed.latestRoundData();
+        (, int256 price,,,) = priceFeed.staleCheckLatestRoundData();
         // Chainlink 的大多数 USD 价格对有 8 位小数，比如：ETH/USD = 2000 USD 返回值 = 2000 * 1e8 = 200000000000
         //计算代币数量
         //PRECISION 用于统一单位，通常是 1e18，因为我们习惯用 18 位小数表示金额。
         //ADDITIONAL_FEED_PRECISION 用于调整价格的精度，因为价格通常是 8 位小数，我们需要把它调整到 18 位小数。 通常设置为 1e10，因为 1e18 / 1e8 = 1e10，保证单位匹配。
         return ((usdAmountInWei * PRECISION) / (uint256(price) * ADDITIONAL_FEED_PRECISION));
+    }
+
+    function getCollateralBalanceOfUser(address user, address token) external view returns (uint256) {
+        return s_collateralDeposited[user][token];
+    }
+    function getPrecision() external pure returns (uint256) {
+        return PRECISION;
+    }
+
+    function getAdditionalFeedPrecision() external pure returns (uint256) {
+        return ADDITIONAL_FEED_PRECISION;
+    }
+
+    function getLiquidationThreshold() external pure returns (uint256) {
+        return LIQUIDATION_THRESHOLD;
+    }
+
+    function getLiquidationBonus() external pure returns (uint256) {
+        return LIQUIDATION_BONUS;
+    }
+
+    function getLiquidationPrecision() external pure returns (uint256) {
+        return LIQUIDATION_PRECISION;
+    }
+
+    function getMinHealthFactor() external pure returns (uint256) {
+        return MIN_HEALTH_FACTOR;
+    }
+
+    function getCollateralTokens() external view returns (address[] memory) {
+        return s_collateralTokens;
+    }
+
+    function getDsc() external view returns (address) {
+        return address(i_dsc);
+    }
+
+    function getCollateralTokenPriceFeed(address token) external view returns (address) {
+        return s_priceFeeds[token];
+    }
+
+    function getHealthFactor(address user) external view returns (uint256) {
+        return _healthFactor(user);
     }
 }

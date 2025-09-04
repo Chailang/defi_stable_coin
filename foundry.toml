@@ -10,3 +10,8 @@ remappings = [
 ]
 [fuzz]
 runs = 100
+
+[invariant]
+runs = 1000
+deep = 128
+fail_on_revert = false

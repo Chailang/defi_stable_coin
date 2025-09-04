@@ -9,9 +9,9 @@ contract MyTest{
       //  if (data == 2){
       //     showAlaysBeZero = 1;
       //  }
-       if (hiddenValue == 7){
-          showAlaysBeZero = 1;
-       }
+      //  if (hiddenValue == 7){
+      //     showAlaysBeZero = 1;
+      //  }
        hiddenValue = data;
     }
    
